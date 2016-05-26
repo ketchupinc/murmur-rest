@@ -271,6 +271,59 @@ class ServersView(FlaskView):
         }
         return Response(json.dumps(json_data, sort_keys=True, indent=4), mimetype='application/json')
 
+    @conditional(auth.login_required, auth_enabled)
+    @route('<int:id>/user/<int:userid>/mute', methods=['POST'])
+    def user_mute_user(self, id, userid):
+        """ Mutes a user
+        """
+
+        server = meta.getServer(id)
+
+        # Return 404 if not found
+        if server is None:
+            return jsonify(message="No Server Found for ID " + str(id)), 500
+
+        user = self.get_user(server, userid)
+        if user is None:
+            return jsonify(message="No User Found for ID " + str(userid)), 500
+
+        state = server.getState(user.session)
+        state.mute = True
+
+        server.setState(state)
+
+        json_data = {
+            "user_id": user.userid,
+            "muted": 'Success'
+        }
+        return Response(json.dumps(json_data, sort_keys=True, indent=4), mimetype='application/json')
+
+    @conditional(auth.login_required, auth_enabled)
+    @route('<int:id>/user/<int:userid>/unmute', methods=['POST'])
+    def user_unmute_user(self, id, userid):
+        """ Unmutes a user
+        """
+
+        server = meta.getServer(id)
+
+        # Return 404 if not found
+        if server is None:
+            return jsonify(message="No Server Found for ID " + str(id)), 500
+
+        user = self.get_user(server, userid)
+        if user is None:
+            return jsonify(message="No User Found for ID " + str(userid)), 500
+
+        state = server.getState(user.session)
+        state.mute = False
+
+        server.setState(state)
+
+        json_data = {
+            "user_id": user.userid,
+            "unmuted": 'Success'
+        }
+        return Response(json.dumps(json_data, sort_keys=True, indent=4), mimetype='application/json')
 
     @conditional(auth.login_required, auth_enabled)
     @route('<int:id>/user', methods=['POST'])
@@ -562,6 +615,15 @@ class ServersView(FlaskView):
 
         else:
             return jsonify(message="User session required.")
+
+
+    def get_user(self, server, userid):
+        # TODO: This is really non-scalable as the numner of users on the server grows
+        #       Find a better way to get a user by userid from mumble
+        try:
+            return [u for u in server.getUsers().values() if u.userid == userid][0]
+        except ValueError:
+            return None
 
 
 class StatsView(FlaskView):
