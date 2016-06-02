@@ -289,6 +289,7 @@ class ServersView(FlaskView):
 
         state = server.getState(user.session)
         state.mute = True
+        state.suppress = True
 
         server.setState(state)
 
@@ -316,6 +317,7 @@ class ServersView(FlaskView):
 
         state = server.getState(user.session)
         state.mute = False
+        state.suppress = False
 
         server.setState(state)
 
@@ -625,7 +627,7 @@ class ServersView(FlaskView):
         acls, groups, inherit = settings
 
         acl_list = []
-        # Don't allow regular users to mute/unmute themselves (they default to being muted)
+        # By default don't allow users to speak in moderated rooms
         deny_acl = Murmur.ACL()
         deny_acl.applyHere = True
         deny_acl.applySubs = False
