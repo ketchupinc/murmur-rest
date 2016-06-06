@@ -271,6 +271,61 @@ class ServersView(FlaskView):
         }
         return Response(json.dumps(json_data, sort_keys=True, indent=4), mimetype='application/json')
 
+    @conditional(auth.login_required, auth_enabled)
+    @route('<int:id>/user/<int:userid>/mute', methods=['POST'])
+    def user_mute_user(self, id, userid):
+        """ Mutes a user
+        """
+
+        server = meta.getServer(id)
+
+        # Return 404 if not found
+        if server is None:
+            return jsonify(message="No Server Found for ID " + str(id)), 500
+
+        user = self.get_user(server, userid)
+        if user is None:
+            return jsonify(message="No User Found for ID " + str(userid)), 500
+
+        state = server.getState(user.session)
+        state.mute = True
+        state.suppress = True
+
+        server.setState(state)
+
+        json_data = {
+            "user_id": user.userid,
+            "muted": 'Success'
+        }
+        return Response(json.dumps(json_data, sort_keys=True, indent=4), mimetype='application/json')
+
+    @conditional(auth.login_required, auth_enabled)
+    @route('<int:id>/user/<int:userid>/unmute', methods=['POST'])
+    def user_unmute_user(self, id, userid):
+        """ Unmutes a user
+        """
+
+        server = meta.getServer(id)
+
+        # Return 404 if not found
+        if server is None:
+            return jsonify(message="No Server Found for ID " + str(id)), 500
+
+        user = self.get_user(server, userid)
+        if user is None:
+            return jsonify(message="No User Found for ID " + str(userid)), 500
+
+        state = server.getState(user.session)
+        state.mute = False
+        state.suppress = False
+
+        server.setState(state)
+
+        json_data = {
+            "user_id": user.userid,
+            "unmuted": 'Success'
+        }
+        return Response(json.dumps(json_data, sort_keys=True, indent=4), mimetype='application/json')
 
     @conditional(auth.login_required, auth_enabled)
     @route('<int:id>/user', methods=['POST'])
@@ -498,6 +553,101 @@ class ServersView(FlaskView):
         return Response(json.dumps(data, sort_keys=True, indent=4), mimetype='application/json')
 
     @conditional(auth.login_required, auth_enabled)
+    @route('<int:id>/channels/<int:channel_id>/password', methods=['POST'])
+    def channel_password(self, id, channel_id):
+        """ Set a password on a channel
+        """
+
+        password = request.form.get("password")
+
+        server = meta.getServer(id)
+
+        # Return 404 if not found
+        if server is None:
+            return jsonify(message="Not Found"), 404
+
+        try:
+            settings = server.getACL(channel_id)
+        except Murmur.InvalidChannelException:
+            return jsonify(message="Channel Not Found"), 404
+
+        acls, groups, inherit = settings
+
+        acl_list = []
+        # Don't allow anyone in the channel
+        deny_acl = Murmur.ACL()
+        deny_acl.applyHere = True
+        deny_acl.applySubs = False
+        deny_acl.inherited = False
+        deny_acl.userid = -1
+        deny_acl.group = "all"
+        deny_acl.allow = 0
+        deny_acl.deny = 910L
+        acl_list.append(deny_acl)
+
+        # Only allow people that know the password to join and speak
+        password_acl = Murmur.ACL()
+        password_acl.applyHere = True
+        password_acl.applySubs = False
+        password_acl.inherited = False
+        password_acl.userid = -1
+        password_acl.group = "#" + password
+        password_acl.allow = 910L
+        password_acl.deny = 0
+        acl_list.append(password_acl)
+
+        server.setACL(channel_id, acl_list, groups, inherit)
+
+        data = {
+            "channel_id": channel_id,
+            "set_password": 'Success'
+        }
+
+        return Response(json.dumps(data, sort_keys=True, indent=4), mimetype='application/json')
+
+    @conditional(auth.login_required, auth_enabled)
+    @route('<int:id>/channels/<int:channel_id>/moderate', methods=['POST'])
+    def channel_moderate(self, id, channel_id):
+        """ Enable moderation mode on a channel
+        """
+
+        moderator_id = request.form.get("moderator_id")
+
+        server = meta.getServer(id)
+
+        # Return 404 if not found
+        if server is None:
+            return jsonify(message="Not Found"), 404
+
+        try:
+            settings = server.getACL(channel_id)
+        except Murmur.InvalidChannelException:
+            return jsonify(message="Channel Not Found"), 404
+
+        acls, groups, inherit = settings
+
+        acl_list = []
+        # By default don't allow users to speak in moderated rooms
+        deny_acl = Murmur.ACL()
+        deny_acl.applyHere = True
+        deny_acl.applySubs = False
+        deny_acl.inherited = False
+        deny_acl.userid = -1
+        deny_acl.group = "all"
+        deny_acl.allow = 0
+        deny_acl.deny = 8L
+        acl_list.append(deny_acl)
+
+        server.setACL(channel_id, acl_list, groups, inherit)
+
+        data = {
+            "channel_id": channel_id,
+            "set_password": 'Success'
+        }
+
+        return Response(json.dumps(data, sort_keys=True, indent=4), mimetype='application/json')
+
+    @conditional(auth.login_required, auth_enabled)
     @route('<int:id>/sendmessage', methods=['POST'])
     def send_message(self, id):
         """ Sends a message to all channels in a server
@@ -562,6 +712,15 @@ class ServersView(FlaskView):
 
         else:
             return jsonify(message="User session required.")
+
+
+    def get_user(self, server, userid):
+        # TODO: This is really non-scalable as the numner of users on the server grows
+        #       Find a better way to get a user by userid from mumble
+        try:
+            return [u for u in server.getUsers().values() if u.userid == int(userid)][0]
+        except IndexError, ValueError:
+            return None
 
 
 class StatsView(FlaskView):
