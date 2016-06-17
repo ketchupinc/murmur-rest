@@ -279,13 +279,12 @@ class ServersView(FlaskView):
 
         server = meta.getServer(id)
 
-        # Return 404 if not found
         if server is None:
-            return jsonify(message="No Server Found for ID " + str(id)), 500
+            return jsonify(message="Server Not Found"), 404
 
         user = self.get_user(server, userid)
         if user is None:
-            return jsonify(message="No User Found for ID " + str(userid)), 500
+            return jsonify(message="User Not Found"), 404
 
         state = server.getState(user.session)
         state.mute = True
@@ -307,13 +306,12 @@ class ServersView(FlaskView):
 
         server = meta.getServer(id)
 
-        # Return 404 if not found
         if server is None:
-            return jsonify(message="No Server Found for ID " + str(id)), 500
+            return jsonify(message="Server Not Found"), 404
 
         user = self.get_user(server, userid)
         if user is None:
-            return jsonify(message="No User Found for ID " + str(userid)), 500
+            return jsonify(message="User Not Found"), 404
 
         state = server.getState(user.session)
         state.mute = False
