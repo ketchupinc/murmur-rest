@@ -713,11 +713,11 @@ class ServersView(FlaskView):
 
 
     def get_user(self, server, userid):
-        # TODO: This is really non-scalable as the numner of users on the server grows
+        # TODO: This is really non-scalable as the number of users on the server grows
         #       Find a better way to get a user by userid from mumble
         try:
             return [u for u in server.getUsers().values() if u.userid == int(userid)][0]
-        except IndexError, ValueError:
+        except ValueError:
             return None
 
 
